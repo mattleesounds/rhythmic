@@ -160,7 +160,7 @@ const GameCanvas: React.FC = () => {
       >
         Full Screen
       </button>
-      <audio ref={audioRef} src="polpishTest1.wav"></audio>
+      <audio ref={audioRef} src="Rhythmic1_Demo1.wav"></audio>
     </div>
   );
 };
