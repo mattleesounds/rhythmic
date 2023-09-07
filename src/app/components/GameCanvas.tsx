@@ -22,6 +22,8 @@ const GameCanvas: React.FC = () => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const compSoundRef = useRef<HTMLAudioElement | null>(null);
+  const goodTapSoundRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
@@ -38,7 +40,35 @@ const GameCanvas: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (audio && !audioContext) {
+      const newAudioContext = new (window.AudioContext ||
+        window.AudioContext)();
+      setAudioContext(newAudioContext);
+      const audioSource = newAudioContext.createMediaElementSource(audio);
+
+      const newAnalyser = newAudioContext.createAnalyser();
+      setAnalyser(newAnalyser); // set state
+      audioSource.connect(newAnalyser);
+      newAnalyser.connect(newAudioContext.destination);
+    }
+  }, []);
+
   const togglePlayPause = () => {
+    const audio = audioRef.current;
+    if (audio && audioContext) {
+      if (isPlaying) {
+        audioContext.suspend();
+        audio.pause();
+      } else {
+        audioContext.resume();
+        audio.play();
+      }
+      setIsPlaying(!isPlaying);
+    }
+  };
+  /* const togglePlayPause = () => {
     const audio = audioRef.current;
     if (audio) {
       if (!audioContext) {
@@ -46,10 +76,12 @@ const GameCanvas: React.FC = () => {
           window.AudioContext)();
         setAudioContext(newAudioContext);
         const audioSource = newAudioContext.createMediaElementSource(audio);
-        const newAnalyser = newAudioContext.createAnalyser();
-        setAnalyser(newAnalyser); // set state
-        audioSource.connect(newAnalyser);
-        newAnalyser.connect(newAudioContext.destination);
+        if (!analyser) {
+          const newAnalyser = newAudioContext.createAnalyser();
+          setAnalyser(newAnalyser); // set state
+          audioSource.connect(newAnalyser);
+          newAnalyser.connect(newAudioContext.destination);
+        }
       }
       if (isPlaying) {
         audioContext?.suspend();
@@ -60,22 +92,27 @@ const GameCanvas: React.FC = () => {
       }
       setIsPlaying(!isPlaying);
     }
-  };
+  }; */
 
   useEffect(() => {
+    console.log("useEffect called");
     if (!analyser) return;
 
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
     const audio = audioRef.current;
 
-    console.log("useEffect called");
+    /* console.log("useEffect called");
     console.log("canvasRef.current:", canvasRef.current);
-
+ */
     if (!ctx || !audio) return;
 
     const handleKeyDown = (event: any) => {
+      console.log("Key Down Event:", event);
+
       if (event.keyCode >= 32 && event.keyCode <= 90) {
+        if (event.repeat) return;
+
         goodTap.current = true;
 
         // Clear any existing timeouts
@@ -93,7 +130,7 @@ const GameCanvas: React.FC = () => {
     window.addEventListener("keydown", handleKeyDown);
 
     const gameLoop = () => {
-      console.log("gameLoop running");
+      /* console.log("gameLoop running"); */
       if (!analyser) return;
 
       requestAnimationFrame(gameLoop);
@@ -117,18 +154,29 @@ const GameCanvas: React.FC = () => {
       }
 
       const currentAudioTime = audio.currentTime * 1000;
+
+      //Flash blue and play comp tap sound according to programmed hits
       for (const cue of rhythmPattern) {
         if (Math.abs(cue.time - currentAudioTime) < 50) {
           ctx.fillStyle = "blue";
           ctx.fillRect(0, 0, canvas!.width, canvas!.height);
+          compSoundRef.current?.play();
         }
       }
 
+      //Flash green and play good tap sound when a good tap is detected
       if (goodTap.current) {
         ctx.fillStyle = "green";
         ctx.fillRect(0, 0, canvas!.width, canvas!.height);
-        //goodTap.current = false; // Reset it back to false
-        console.log("goodTap set to false");
+        if (goodTapSoundRef.current) {
+          console.log("About to play audio");
+          goodTapSoundRef.current.currentTime = 0;
+          goodTapSoundRef.current
+            .play()
+            .catch((e) => console.log("Play error: ", e));
+          console.log("Audio should have played");
+        }
+        goodTap.current = false;
       }
     };
 
@@ -161,6 +209,11 @@ const GameCanvas: React.FC = () => {
         Full Screen
       </button>
       <audio ref={audioRef} src="Rhythmic1_Demo1.wav"></audio>
+      <audio ref={compSoundRef} src="207957__altemark__tom-1.wav"></audio>
+      <audio
+        ref={goodTapSoundRef}
+        src="173838__yellowtree__tom-high.wav"
+      ></audio>
     </div>
   );
 };
