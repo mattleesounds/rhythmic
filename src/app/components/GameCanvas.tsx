@@ -24,9 +24,11 @@ const GameCanvas: React.FC = () => {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const compSoundRef = useRef<HTMLAudioElement | null>(null);
   const goodTapSoundRef = useRef<HTMLAudioElement | null>(null);
-  const rhythmPatternRef = useRef<any[]>([]);
+  const userHitTimingsRef = useRef<any[]>([]);
   const goodTapSoundBuffer = useRef<AudioBuffer | null>(null);
   const compHitTimingsRef = useRef<number[]>([]);
+  const badTapSoundBuffer = useRef<AudioBuffer | null>(null);
+  const lastPlayedBadTapRef = useRef<number | null>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
@@ -43,7 +45,8 @@ const GameCanvas: React.FC = () => {
       const data = await response.text();
       const times = data.split("\n").map(Number);
       const newRhythmPattern = times.map((time) => ({ type: "hit", time }));
-      rhythmPatternRef.current = newRhythmPattern;
+      userHitTimingsRef.current = newRhythmPattern;
+      console.log("User hit timings:", userHitTimingsRef.current);
     } catch (error) {
       console.error("An error occurred while fetching the CSV file:", error);
     }
@@ -76,6 +79,10 @@ const GameCanvas: React.FC = () => {
   const handleKeyDown = (event: any) => {
     if (event.keyCode >= 32 && event.keyCode <= 90 && !event.repeat) {
       goodTapRef.current = Date.now();
+      console.log(`Key pressed at: ${goodTapRef.current}`);
+      let audioStartTime = audioRef.current!.currentTime * 1000;
+      let timeElapsed = Date.now() - audioStartTime;
+      console.log(`Time elapsed since audio started: ${timeElapsed} ms`);
     }
   };
 
@@ -93,6 +100,17 @@ const GameCanvas: React.FC = () => {
         console.log("Playing user tap sound");
         const source = audioContext.createBufferSource();
         source.buffer = goodTapSoundBuffer.current;
+        source.connect(audioContext.destination);
+        source.start();
+      }
+    };
+
+    const handleBadTap = () => {
+      console.log("Trying to play bad tap sound");
+      if (badTapSoundBuffer.current && audioContext) {
+        console.log("Playing bad tap sound");
+        const source = audioContext.createBufferSource();
+        source.buffer = badTapSoundBuffer.current;
         source.connect(audioContext.destination);
         source.start();
       }
@@ -128,15 +146,35 @@ const GameCanvas: React.FC = () => {
     if (goodTapRef.current) {
       const timeSinceTap = Date.now() - goodTapRef.current;
 
-      if (timeSinceTap < 50) {
-        // Assuming 500ms as the desired flash duration
-        ctx.fillStyle = "green";
-        ctx.fillRect(0, 0, canvas!.width, canvas!.height);
-      }
+      const isGoodHit = userHitTimingsRef.current.some(
+        (t) => Math.abs(timeSinceTap - t.time) <= 50
+      );
 
-      if (lastPlayedTapRef.current !== goodTapRef.current) {
-        handleUserTap();
-        lastPlayedTapRef.current = goodTapRef.current;
+      console.log("Checking hit type...", goodTapRef.current, isGoodHit);
+
+      if (goodTapRef.current) {
+        const timeSinceTap = Date.now() - goodTapRef.current;
+
+        // Assuming you have a window of 100ms to register a "good" tap
+        const wasGoodTap = userHitTimingsRef.current.some(
+          (hitTime) => Math.abs(goodTapRef.current! - hitTime.time) <= 20
+        );
+
+        if (
+          wasGoodTap &&
+          timeSinceTap < 50 &&
+          lastPlayedTapRef.current !== goodTapRef.current
+        ) {
+          handleUserTap();
+          lastPlayedTapRef.current = goodTapRef.current;
+        } else if (
+          !wasGoodTap &&
+          timeSinceTap < 50 &&
+          lastPlayedBadTapRef.current !== goodTapRef.current
+        ) {
+          handleBadTap();
+          lastPlayedBadTapRef.current = goodTapRef.current;
+        }
       }
     }
 
@@ -171,6 +209,12 @@ const GameCanvas: React.FC = () => {
         .then((arrayBuffer) => audioContext.decodeAudioData(arrayBuffer))
         .then((audioBuffer) => {
           goodTapSoundBuffer.current = audioBuffer;
+        });
+      fetch("badhit2.wav")
+        .then((response) => response.arrayBuffer())
+        .then((arrayBuffer) => audioContext.decodeAudioData(arrayBuffer))
+        .then((audioBuffer) => {
+          badTapSoundBuffer.current = audioBuffer;
         });
     }
 
