@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 
-const rhythmPattern = [
+/* const rhythmPattern = [
   { type: "hit", time: 2000 },
   { type: "hit", time: 4000 },
   { type: "hit", time: 6000 },
@@ -15,7 +15,7 @@ const rhythmPattern = [
   { type: "hit", time: 20000 },
   { type: "hit", time: 22000 },
   { type: "hit", time: 24000 },
-];
+]; */
 
 const GameCanvas: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -24,10 +24,42 @@ const GameCanvas: React.FC = () => {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const compSoundRef = useRef<HTMLAudioElement | null>(null);
   const goodTapSoundRef = useRef<HTMLAudioElement | null>(null);
+  const rhythmPatternRef = useRef<any[]>([]);
+  const goodTapSoundBuffer = useRef<AudioBuffer | null>(null);
+  const compHitTimingsRef = useRef<number[]>([]);
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
-  const goodTap = useRef(false);
+  //const goodTap = useRef(false);
+  const [goodTap, setGoodTap] = useState(false);
+  const [, forceRender] = useState(0);
+
+  // Function to read CSV and populate rhythmPattern
+  const loadUserCSV = async () => {
+    try {
+      const response = await fetch("hit_timingsUser1.csv");
+      const data = await response.text();
+      const times = data.split("\n").map(Number);
+      const newRhythmPattern = times.map((time) => ({ type: "hit", time }));
+      rhythmPatternRef.current = newRhythmPattern;
+    } catch (error) {
+      console.error("An error occurred while fetching the CSV file:", error);
+    }
+  };
+
+  const loadCompCSV = async () => {
+    try {
+      const response = await fetch("hit_timings.csv");
+      const data = await response.text();
+      const times = data.split("\n").map(Number);
+      const newRhythmPattern = times.map((time) => ({ type: "hit", time }));
+      compHitTimingsRef.current = times;
+      /* console.log("Loaded Comp Timings:", times); */
+    } catch (error) {
+      console.error("An error occurred while fetching the CSV file:", error);
+    }
+  };
 
   const toggleFullScreen = () => {
     const container = containerRef.current;
@@ -42,18 +74,31 @@ const GameCanvas: React.FC = () => {
 
   useEffect(() => {
     const audio = audioRef.current;
-    if (audio && !audioContext) {
-      const newAudioContext = new (window.AudioContext ||
-        window.AudioContext)();
-      setAudioContext(newAudioContext);
-      const audioSource = newAudioContext.createMediaElementSource(audio);
 
+    if (audio && !audioContext) {
+      const newAudioContext = new window.AudioContext();
+      setAudioContext(newAudioContext);
+
+      const audioSource = newAudioContext.createMediaElementSource(audio);
       const newAnalyser = newAudioContext.createAnalyser();
-      setAnalyser(newAnalyser); // set state
+      setAnalyser(newAnalyser);
+
       audioSource.connect(newAnalyser);
       newAnalyser.connect(newAudioContext.destination);
     }
-  }, []);
+
+    if (audioContext) {
+      fetch("userhit3.wav")
+        .then((response) => response.arrayBuffer())
+        .then((arrayBuffer) => audioContext.decodeAudioData(arrayBuffer))
+        .then((audioBuffer) => {
+          goodTapSoundBuffer.current = audioBuffer;
+        });
+    }
+
+    loadUserCSV();
+    loadCompCSV();
+  }, [audioContext]);
 
   const togglePlayPause = () => {
     const audio = audioRef.current;
@@ -68,43 +113,14 @@ const GameCanvas: React.FC = () => {
       setIsPlaying(!isPlaying);
     }
   };
-  /* const togglePlayPause = () => {
-    const audio = audioRef.current;
-    if (audio) {
-      if (!audioContext) {
-        const newAudioContext = new (window.AudioContext ||
-          window.AudioContext)();
-        setAudioContext(newAudioContext);
-        const audioSource = newAudioContext.createMediaElementSource(audio);
-        if (!analyser) {
-          const newAnalyser = newAudioContext.createAnalyser();
-          setAnalyser(newAnalyser); // set state
-          audioSource.connect(newAnalyser);
-          newAnalyser.connect(newAudioContext.destination);
-        }
-      }
-      if (isPlaying) {
-        audioContext?.suspend();
-        audio.pause();
-      } else {
-        audioContext?.resume();
-        audio.play();
-      }
-      setIsPlaying(!isPlaying);
-    }
-  }; */
 
   useEffect(() => {
-    console.log("useEffect called");
     if (!analyser) return;
 
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
     const audio = audioRef.current;
 
-    /* console.log("useEffect called");
-    console.log("canvasRef.current:", canvasRef.current);
- */
     if (!ctx || !audio) return;
 
     const handleKeyDown = (event: any) => {
@@ -112,19 +128,19 @@ const GameCanvas: React.FC = () => {
 
       if (event.keyCode >= 32 && event.keyCode <= 90) {
         if (event.repeat) return;
-
-        goodTap.current = true;
-
-        // Clear any existing timeouts
-        if (timeoutRef.current !== null) {
-          clearTimeout(timeoutRef.current);
-        }
-
-        // Set the timeout to reset the goodTap
-        timeoutRef.current = setTimeout(() => {
-          goodTap.current = false;
-        }, 50); // 50 ms
       }
+
+      setGoodTap((prev) => {
+        console.log("Setting Good Tap to: true");
+        return true;
+      });
+      forceRender((n) => n + 1);
+      setTimeout(() => {
+        setGoodTap((prev) => {
+          console.log("Setting Good Tap to: false");
+          return false;
+        });
+      }, 500);
     };
 
     window.addEventListener("keydown", handleKeyDown);
@@ -132,8 +148,6 @@ const GameCanvas: React.FC = () => {
     const gameLoop = () => {
       /* console.log("gameLoop running"); */
       if (!analyser) return;
-
-      requestAnimationFrame(gameLoop);
 
       let frequencyData = new Uint8Array(analyser.frequencyBinCount);
 
@@ -154,38 +168,48 @@ const GameCanvas: React.FC = () => {
       }
 
       const currentAudioTime = audio.currentTime * 1000;
+      const buffer = 50;
 
-      //Flash blue and play comp tap sound according to programmed hits
-      for (const cue of rhythmPattern) {
-        if (Math.abs(cue.time - currentAudioTime) < 50) {
-          ctx.fillStyle = "blue";
-          ctx.fillRect(0, 0, canvas!.width, canvas!.height);
-          compSoundRef.current?.play();
-        }
+      const isCompHitTime = compHitTimingsRef.current.some(
+        (t) => Math.abs(currentAudioTime - t) <= buffer
+      );
+
+      if (isCompHitTime) {
+        ctx.fillStyle = "blue";
+        ctx.fillRect(0, 0, canvas!.width, canvas!.height);
       }
 
-      //Flash green and play good tap sound when a good tap is detected
-      if (goodTap.current) {
+      if (goodTap) {
+        console.log("Rendering Good Tap");
         ctx.fillStyle = "green";
         ctx.fillRect(0, 0, canvas!.width, canvas!.height);
-        if (goodTapSoundRef.current) {
-          console.log("About to play audio");
-          goodTapSoundRef.current.currentTime = 0;
-          goodTapSoundRef.current
-            .play()
-            .catch((e) => console.log("Play error: ", e));
-          console.log("Audio should have played");
+
+        console.log("Trying to play sound");
+        if (
+          goodTapSoundBuffer.current &&
+          audioContext &&
+          audioContext.state === "running"
+        ) {
+          console.log("Playing Good Tap Sound");
+          const source = audioContext.createBufferSource();
+          source.buffer = goodTapSoundBuffer.current;
+          source.connect(audioContext.destination);
+          source.start();
+        } else {
+          console.log("Audio Context not running");
         }
-        goodTap.current = false;
       }
+
+      requestAnimationFrame(gameLoop);
     };
 
     gameLoop();
 
     return () => {
+      console.log("Cleaning up keydown listener");
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [analyser]);
+  }, [analyser, audioContext]);
 
   return (
     <div className="relative" ref={containerRef}>
@@ -208,12 +232,8 @@ const GameCanvas: React.FC = () => {
       >
         Full Screen
       </button>
-      <audio ref={audioRef} src="Rhythmic1_Demo1.wav"></audio>
-      <audio ref={compSoundRef} src="207957__altemark__tom-1.wav"></audio>
-      <audio
-        ref={goodTapSoundRef}
-        src="173838__yellowtree__tom-high.wav"
-      ></audio>
+      <audio ref={audioRef} src="Rhythmic2.wav"></audio>
+      {/* <audio ref={goodTapSoundRef} src="userhit3.wav"></audio> */}
     </div>
   );
 };
