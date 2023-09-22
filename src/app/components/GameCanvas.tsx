@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 
 /* const rhythmPattern = [
   { type: "hit", time: 2000 },
@@ -31,8 +31,9 @@ const GameCanvas: React.FC = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
-  //const goodTap = useRef(false);
-  const [goodTap, setGoodTap] = useState(false);
+  const goodTapRef = useRef<number | null>(null);
+  const lastPlayedTapRef = useRef<number | null>(null);
+  //const [goodTap, setGoodTap] = useState(false);
   const [, forceRender] = useState(0);
 
   // Function to read CSV and populate rhythmPattern
@@ -71,6 +72,83 @@ const GameCanvas: React.FC = () => {
       }
     }
   };
+
+  const handleKeyDown = (event: any) => {
+    if (event.keyCode >= 32 && event.keyCode <= 90 && !event.repeat) {
+      goodTapRef.current = Date.now();
+    }
+  };
+
+  const gameLoop = useCallback(() => {
+    /* console.log("Inside gameLoop. goodTap:", goodTapRef); */
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    const audio = audioRef.current;
+
+    if (!ctx || !audio || !analyser) return;
+
+    const handleUserTap = () => {
+      console.log("Trying to play user tap sound");
+      if (goodTapSoundBuffer.current && audioContext) {
+        console.log("Playing user tap sound");
+        const source = audioContext.createBufferSource();
+        source.buffer = goodTapSoundBuffer.current;
+        source.connect(audioContext.destination);
+        source.start();
+      }
+    };
+
+    // Update frequency data
+    let frequencyData = new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteFrequencyData(frequencyData);
+
+    // Clear the canvas
+    ctx.clearRect(0, 0, canvas!.width, canvas!.height);
+    ctx.fillStyle = "grey";
+    ctx.fillRect(0, 0, canvas!.width, canvas!.height);
+
+    ctx.fillStyle = "white";
+    for (let i = 0; i < frequencyData.length; i++) {
+      const value = frequencyData[i];
+      ctx.fillRect(i * 3, canvas!.height - value, 2, value);
+    }
+
+    const currentAudioTime = audio.currentTime * 1000;
+    const buffer = 50;
+
+    const isCompHitTime = compHitTimingsRef.current.some(
+      (t) => Math.abs(currentAudioTime - t) <= buffer
+    );
+
+    if (isCompHitTime) {
+      ctx.fillStyle = "blue";
+      ctx.fillRect(0, 0, canvas!.width, canvas!.height);
+    }
+
+    if (goodTapRef.current) {
+      const timeSinceTap = Date.now() - goodTapRef.current;
+
+      if (timeSinceTap < 50) {
+        // Assuming 500ms as the desired flash duration
+        ctx.fillStyle = "green";
+        ctx.fillRect(0, 0, canvas!.width, canvas!.height);
+      }
+
+      if (lastPlayedTapRef.current !== goodTapRef.current) {
+        handleUserTap();
+        lastPlayedTapRef.current = goodTapRef.current;
+      }
+    }
+
+    requestAnimationFrame(gameLoop);
+  }, [
+    canvasRef,
+    audioRef,
+    analyser,
+    goodTapRef,
+    lastPlayedTapRef,
+    audioContext,
+  ]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -123,85 +201,7 @@ const GameCanvas: React.FC = () => {
 
     if (!ctx || !audio) return;
 
-    const handleKeyDown = (event: any) => {
-      console.log("Key Down Event:", event);
-
-      if (event.keyCode >= 32 && event.keyCode <= 90) {
-        if (event.repeat) return;
-      }
-
-      setGoodTap((prev) => {
-        console.log("Setting Good Tap to: true");
-        return true;
-      });
-      forceRender((n) => n + 1);
-      setTimeout(() => {
-        setGoodTap((prev) => {
-          console.log("Setting Good Tap to: false");
-          return false;
-        });
-      }, 500);
-    };
-
     window.addEventListener("keydown", handleKeyDown);
-
-    const gameLoop = () => {
-      /* console.log("gameLoop running"); */
-      if (!analyser) return;
-
-      let frequencyData = new Uint8Array(analyser.frequencyBinCount);
-
-      // Update frequency data
-      analyser.getByteFrequencyData(frequencyData);
-
-      // Clear the canvas
-      ctx.clearRect(0, 0, canvas!.width, canvas!.height);
-
-      // Since we already checked ctx and audio, we can safely access their properties.
-      ctx.fillStyle = "grey";
-      ctx.fillRect(0, 0, canvas!.width, canvas!.height);
-
-      ctx.fillStyle = "white";
-      for (let i = 0; i < frequencyData.length; i++) {
-        const value = frequencyData[i];
-        ctx.fillRect(i * 3, canvas!.height - value, 2, value);
-      }
-
-      const currentAudioTime = audio.currentTime * 1000;
-      const buffer = 50;
-
-      const isCompHitTime = compHitTimingsRef.current.some(
-        (t) => Math.abs(currentAudioTime - t) <= buffer
-      );
-
-      if (isCompHitTime) {
-        ctx.fillStyle = "blue";
-        ctx.fillRect(0, 0, canvas!.width, canvas!.height);
-      }
-
-      if (goodTap) {
-        console.log("Rendering Good Tap");
-        ctx.fillStyle = "green";
-        ctx.fillRect(0, 0, canvas!.width, canvas!.height);
-
-        console.log("Trying to play sound");
-        if (
-          goodTapSoundBuffer.current &&
-          audioContext &&
-          audioContext.state === "running"
-        ) {
-          console.log("Playing Good Tap Sound");
-          const source = audioContext.createBufferSource();
-          source.buffer = goodTapSoundBuffer.current;
-          source.connect(audioContext.destination);
-          source.start();
-        } else {
-          console.log("Audio Context not running");
-        }
-      }
-
-      requestAnimationFrame(gameLoop);
-    };
 
     gameLoop();
 
@@ -209,7 +209,7 @@ const GameCanvas: React.FC = () => {
       console.log("Cleaning up keydown listener");
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [analyser, audioContext]);
+  }, [analyser, audioContext, gameLoop]);
 
   return (
     <div className="relative" ref={containerRef}>
