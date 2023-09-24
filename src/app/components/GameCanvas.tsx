@@ -1,21 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-
-/* const rhythmPattern = [
-  { type: "hit", time: 2000 },
-  { type: "hit", time: 4000 },
-  { type: "hit", time: 6000 },
-  { type: "hit", time: 8000 },
-  { type: "hit", time: 10000 },
-  { type: "hit", time: 12000 },
-  { type: "hit", time: 14000 },
-  { type: "hit", time: 16000 },
-  { type: "hit", time: 18000 },
-  { type: "hit", time: 20000 },
-  { type: "hit", time: 22000 },
-  { type: "hit", time: 24000 },
-]; */
+import { useRouter } from "next/navigation";
 
 const GameCanvas: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -46,10 +32,12 @@ const GameCanvas: React.FC = () => {
   //const [goodTap, setGoodTap] = useState(false);
   const [, forceRender] = useState(0);
 
+  const router = useRouter();
+
   // Function to read CSV and populate rhythmPattern
   const loadUserCSV = async () => {
     try {
-      const response = await fetch("hit_timingsUser1.csv");
+      const response = await fetch("userhits.csv");
       const data = await response.text();
       const times = data.split("\n").map(Number).filter(Boolean); // Added filter to remove any NaN due to empty lines
 
@@ -71,7 +59,7 @@ const GameCanvas: React.FC = () => {
 
   const loadCompCSV = async () => {
     try {
-      const response = await fetch("hit_timings.csv");
+      const response = await fetch("comphits.csv");
       const data = await response.text();
       const times = data.split("\n").map(Number);
       const newRhythmPattern = times.map((time) => ({ type: "hit", time }));
@@ -101,6 +89,14 @@ const GameCanvas: React.FC = () => {
       let timeElapsed = Date.now() - (audioStartTimeRef.current || 0);
       console.log(`Time elapsed since audio started: ${timeElapsed} ms`);
     }
+  };
+
+  const handleSongEnd = () => {
+    const goodTaps = goodTapCountRef.current;
+    const badTaps = badTapCountRef.current;
+
+    const finalScore = goodTaps - badTaps;
+    router.push(`/score?score=${finalScore}`);
   };
 
   const gameLoop = useCallback(() => {
@@ -181,20 +177,12 @@ const GameCanvas: React.FC = () => {
       }
     };
 
-    ctx.font = "24px Arial";
+    ctx.font = "60px Inter";
     ctx.fillStyle = "green";
-    ctx.fillText(
-      `Good taps: ${goodTapCountRef.current}`,
-      canvas!.width - 200,
-      30
-    );
+    ctx.fillText(`${goodTapCountRef.current}`, canvas!.width - 770, 60);
 
     ctx.fillStyle = "red";
-    ctx.fillText(
-      `Bad taps: ${badTapCountRef.current}`,
-      canvas!.width - 200,
-      60
-    );
+    ctx.fillText(`${badTapCountRef.current}`, canvas!.width - 100, 60);
 
     const currentAudioTime = audio.currentTime * 1000;
     const buffer = 50;
@@ -294,6 +282,15 @@ const GameCanvas: React.FC = () => {
 
     loadUserCSV();
     loadCompCSV();
+
+    if (audio) {
+      audio.addEventListener("ended", handleSongEnd);
+
+      // Cleanup the event listener
+      return () => {
+        audio.removeEventListener("ended", handleSongEnd);
+      };
+    }
   }, [audioContext]);
 
   const togglePlayPause = () => {
@@ -330,6 +327,20 @@ const GameCanvas: React.FC = () => {
     };
   }, [analyser, audioContext, gameLoop]);
 
+  useEffect(() => {
+    const preventSpacebarDefault = (event: KeyboardEvent) => {
+      if (event.keyCode === 32) {
+        event.preventDefault();
+      }
+    };
+
+    window.addEventListener("keydown", preventSpacebarDefault);
+
+    return () => {
+      window.removeEventListener("keydown", preventSpacebarDefault);
+    };
+  }, []);
+
   return (
     <div className="relative" ref={containerRef}>
       <canvas
@@ -338,20 +349,37 @@ const GameCanvas: React.FC = () => {
         height={600}
         className="flex justify-center"
       ></canvas>
-      <button
-        onClick={togglePlayPause}
-        className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white text-black p-4"
-        //className="flex justify-end "
-      >
-        {isPlaying ? "Pause" : "Play"}
-      </button>
-      <button
+      {isPlaying ? (
+        <button
+          onClick={togglePlayPause}
+          className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white text-black p-4"
+        >
+          Pause
+        </button>
+      ) : (
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white text-black p-4">
+          <div>
+            <h2>How to Play:</h2>
+            <p>Press any key from [Space to Z] to hit the rhythm.</p>
+            <p>Try to match the blue flashes for perfect hits!</p>
+            <div className="flex justify-center">
+              <button
+                onClick={togglePlayPause}
+                className="border-black border-solid border-2 p-2 mt-4 mb-2 rounded-lg bg-blue-300"
+              >
+                Play
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* <button
         onClick={toggleFullScreen}
         className="absolute bottom-0  right-0 transform -translate-x-1/2 -translate-y-1/2 bg-white text-black p-0"
       >
         Full Screen
-      </button>
-      <audio ref={audioRef} src="rhythmic1.mp3"></audio>
+      </button> */}
+      <audio ref={audioRef} src="rhythmic3.mp3"></audio>
       {/* <audio ref={goodTapSoundRef} src="userhit3.wav"></audio> */}
     </div>
   );
