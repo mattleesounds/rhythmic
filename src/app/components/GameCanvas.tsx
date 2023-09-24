@@ -278,13 +278,13 @@ const GameCanvas: React.FC = () => {
     }
 
     if (audioContext) {
-      fetch("userhit3.wav")
+      fetch("goodhit1.mp3")
         .then((response) => response.arrayBuffer())
         .then((arrayBuffer) => audioContext.decodeAudioData(arrayBuffer))
         .then((audioBuffer) => {
           goodTapSoundBuffer.current = audioBuffer;
         });
-      fetch("badhit2.wav")
+      fetch("badhit1.mp3")
         .then((response) => response.arrayBuffer())
         .then((arrayBuffer) => audioContext.decodeAudioData(arrayBuffer))
         .then((audioBuffer) => {
@@ -351,7 +351,7 @@ const GameCanvas: React.FC = () => {
       >
         Full Screen
       </button>
-      <audio ref={audioRef} src="Rhythmic2.wav"></audio>
+      <audio ref={audioRef} src="rhythmic1.mp3"></audio>
       {/* <audio ref={goodTapSoundRef} src="userhit3.wav"></audio> */}
     </div>
   );
