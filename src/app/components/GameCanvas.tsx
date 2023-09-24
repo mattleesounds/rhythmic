@@ -29,12 +29,20 @@ const GameCanvas: React.FC = () => {
   const compHitTimingsRef = useRef<number[]>([]);
   const badTapSoundBuffer = useRef<AudioBuffer | null>(null);
   const lastPlayedBadTapRef = useRef<number | null>(null);
+  const audioStartTimeRef = useRef<number | null>(null);
+  const lastGoodTapTimestampRef = useRef<number | null>(null);
+  const lastBadTapTimestampRef = useRef<number | null>(null);
+  const goodTapCountRef = useRef<number>(0);
+  const badTapCountRef = useRef<number>(0);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
   const goodTapRef = useRef<number | null>(null);
   const lastPlayedTapRef = useRef<number | null>(null);
+  const phraseIntervalRef = useRef<number | null>(null);
+  const lastBackgroundColorChangeRef = useRef<number | null>(null);
+  const currentBgColorRef = useRef<string>("black");
   //const [goodTap, setGoodTap] = useState(false);
   const [, forceRender] = useState(0);
 
@@ -43,10 +51,19 @@ const GameCanvas: React.FC = () => {
     try {
       const response = await fetch("hit_timingsUser1.csv");
       const data = await response.text();
-      const times = data.split("\n").map(Number);
+      const times = data.split("\n").map(Number).filter(Boolean); // Added filter to remove any NaN due to empty lines
+
+      // Pop the last value from times and store it in phaseIntervalRef if it exists
+      const lastTime = times.pop();
+      if (typeof lastTime !== "undefined") {
+        phraseIntervalRef.current = lastTime;
+      }
+
       const newRhythmPattern = times.map((time) => ({ type: "hit", time }));
       userHitTimingsRef.current = newRhythmPattern;
+
       console.log("User hit timings:", userHitTimingsRef.current);
+      console.log("Phrase interval:", phraseIntervalRef.current);
     } catch (error) {
       console.error("An error occurred while fetching the CSV file:", error);
     }
@@ -80,8 +97,8 @@ const GameCanvas: React.FC = () => {
     if (event.keyCode >= 32 && event.keyCode <= 90 && !event.repeat) {
       goodTapRef.current = Date.now();
       console.log(`Key pressed at: ${goodTapRef.current}`);
-      let audioStartTime = audioRef.current!.currentTime * 1000;
-      let timeElapsed = Date.now() - audioStartTime;
+
+      let timeElapsed = Date.now() - (audioStartTimeRef.current || 0);
       console.log(`Time elapsed since audio started: ${timeElapsed} ms`);
     }
   };
@@ -94,6 +111,40 @@ const GameCanvas: React.FC = () => {
 
     if (!ctx || !audio || !analyser) return;
 
+    const currentAudioTimeMs = audio.currentTime * 1000;
+
+    if (lastBackgroundColorChangeRef.current === null) {
+      lastBackgroundColorChangeRef.current = currentAudioTimeMs;
+    }
+
+    if (
+      phraseIntervalRef.current &&
+      currentAudioTimeMs - lastBackgroundColorChangeRef.current >=
+        phraseIntervalRef.current
+    ) {
+      // Toggle the background color
+      currentBgColorRef.current =
+        currentBgColorRef.current === "gray" ? "black" : "gray";
+
+      // Update the time of the last background color change
+      lastBackgroundColorChangeRef.current = currentAudioTimeMs;
+    }
+
+    // Update frequency data
+    let frequencyData = new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteFrequencyData(frequencyData);
+
+    // Clear the canvas
+    ctx.clearRect(0, 0, canvas!.width, canvas!.height);
+    ctx.fillStyle = currentBgColorRef.current;
+    ctx.fillRect(0, 0, canvas!.width, canvas!.height);
+
+    ctx.fillStyle = "white";
+    for (let i = 0; i < frequencyData.length; i++) {
+      const value = frequencyData[i];
+      ctx.fillRect(i * 3, canvas!.height - value, 2, value);
+    }
+
     const handleUserTap = () => {
       console.log("Trying to play user tap sound");
       if (goodTapSoundBuffer.current && audioContext) {
@@ -102,6 +153,13 @@ const GameCanvas: React.FC = () => {
         source.buffer = goodTapSoundBuffer.current;
         source.connect(audioContext.destination);
         source.start();
+
+        ctx.fillStyle = "green"; // Set the canvas color to green for good taps
+        ctx.fillRect(0, 0, canvas!.width, canvas!.height);
+
+        lastGoodTapTimestampRef.current = Date.now();
+
+        goodTapCountRef.current += 1;
       }
     };
 
@@ -113,23 +171,30 @@ const GameCanvas: React.FC = () => {
         source.buffer = badTapSoundBuffer.current;
         source.connect(audioContext.destination);
         source.start();
+
+        ctx.fillStyle = "red"; // Set the canvas color to red for bad taps
+        ctx.fillRect(0, 0, canvas!.width, canvas!.height);
+
+        lastBadTapTimestampRef.current = Date.now();
+
+        badTapCountRef.current += 1;
       }
     };
 
-    // Update frequency data
-    let frequencyData = new Uint8Array(analyser.frequencyBinCount);
-    analyser.getByteFrequencyData(frequencyData);
+    ctx.font = "24px Arial";
+    ctx.fillStyle = "green";
+    ctx.fillText(
+      `Good taps: ${goodTapCountRef.current}`,
+      canvas!.width - 200,
+      30
+    );
 
-    // Clear the canvas
-    ctx.clearRect(0, 0, canvas!.width, canvas!.height);
-    ctx.fillStyle = "grey";
-    ctx.fillRect(0, 0, canvas!.width, canvas!.height);
-
-    ctx.fillStyle = "white";
-    for (let i = 0; i < frequencyData.length; i++) {
-      const value = frequencyData[i];
-      ctx.fillRect(i * 3, canvas!.height - value, 2, value);
-    }
+    ctx.fillStyle = "red";
+    ctx.fillText(
+      `Bad taps: ${badTapCountRef.current}`,
+      canvas!.width - 200,
+      60
+    );
 
     const currentAudioTime = audio.currentTime * 1000;
     const buffer = 50;
@@ -146,36 +211,45 @@ const GameCanvas: React.FC = () => {
     if (goodTapRef.current) {
       const timeSinceTap = Date.now() - goodTapRef.current;
 
-      const isGoodHit = userHitTimingsRef.current.some(
-        (t) => Math.abs(timeSinceTap - t.time) <= 50
+      const wasGoodTap = userHitTimingsRef.current.some(
+        (hitTime) => Math.abs(currentAudioTime - hitTime.time) <= 150
       );
 
-      console.log("Checking hit type...", goodTapRef.current, isGoodHit);
-
-      if (goodTapRef.current) {
-        const timeSinceTap = Date.now() - goodTapRef.current;
-
-        // Assuming you have a window of 100ms to register a "good" tap
-        const wasGoodTap = userHitTimingsRef.current.some(
-          (hitTime) => Math.abs(goodTapRef.current! - hitTime.time) <= 20
-        );
-
-        if (
-          wasGoodTap &&
-          timeSinceTap < 50 &&
-          lastPlayedTapRef.current !== goodTapRef.current
-        ) {
-          handleUserTap();
-          lastPlayedTapRef.current = goodTapRef.current;
-        } else if (
-          !wasGoodTap &&
-          timeSinceTap < 50 &&
-          lastPlayedBadTapRef.current !== goodTapRef.current
-        ) {
-          handleBadTap();
-          lastPlayedBadTapRef.current = goodTapRef.current;
-        }
+      if (
+        wasGoodTap &&
+        timeSinceTap < 50 &&
+        lastPlayedTapRef.current !== goodTapRef.current
+      ) {
+        console.log("Playing good tap sound at:", goodTapRef.current);
+        handleUserTap();
+        lastPlayedTapRef.current = goodTapRef.current;
+      } else if (
+        !wasGoodTap &&
+        timeSinceTap < 50 &&
+        lastPlayedBadTapRef.current !== goodTapRef.current
+      ) {
+        console.log("Playing bad tap sound at:", goodTapRef.current);
+        handleBadTap();
+        lastPlayedBadTapRef.current = goodTapRef.current;
       }
+    }
+    const currentTimestamp = Date.now();
+
+    // For good tap
+    if (
+      lastGoodTapTimestampRef.current &&
+      currentTimestamp - lastGoodTapTimestampRef.current <= 50
+    ) {
+      ctx.fillStyle = "green";
+      ctx.fillRect(0, 0, canvas!.width, canvas!.height);
+    }
+    // For bad tap
+    else if (
+      lastBadTapTimestampRef.current &&
+      currentTimestamp - lastBadTapTimestampRef.current <= 50
+    ) {
+      ctx.fillStyle = "red";
+      ctx.fillRect(0, 0, canvas!.width, canvas!.height);
     }
 
     requestAnimationFrame(gameLoop);
@@ -231,6 +305,7 @@ const GameCanvas: React.FC = () => {
       } else {
         audioContext.resume();
         audio.play();
+        audioStartTimeRef.current = Date.now() - audio.currentTime * 1000; // This line captures the start time of the audio.
       }
       setIsPlaying(!isPlaying);
     }
@@ -250,7 +325,7 @@ const GameCanvas: React.FC = () => {
     gameLoop();
 
     return () => {
-      console.log("Cleaning up keydown listener");
+      /* console.log("Cleaning up keydown listener"); */
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [analyser, audioContext, gameLoop]);
