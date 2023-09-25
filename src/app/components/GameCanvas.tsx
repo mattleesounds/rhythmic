@@ -1,5 +1,5 @@
 "use client";
-
+console.log("Running");
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -20,17 +20,16 @@ const GameCanvas: React.FC = () => {
   const lastBadTapTimestampRef = useRef<number | null>(null);
   const goodTapCountRef = useRef<number>(0);
   const badTapCountRef = useRef<number>(0);
-
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
-  const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
   const goodTapRef = useRef<number | null>(null);
   const lastPlayedTapRef = useRef<number | null>(null);
   const phraseIntervalRef = useRef<number | null>(null);
   const lastBackgroundColorChangeRef = useRef<number | null>(null);
   const currentBgColorRef = useRef<string>("black");
-  //const [goodTap, setGoodTap] = useState(false);
-  const [, forceRender] = useState(0);
+
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
+  const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
+  const [isReadyToStart, setIsReadyToStart] = useState(false);
 
   const router = useRouter();
 
@@ -91,13 +90,13 @@ const GameCanvas: React.FC = () => {
     }
   };
 
-  const handleSongEnd = () => {
+  const handleSongEnd = useCallback(() => {
     const goodTaps = goodTapCountRef.current;
     const badTaps = badTapCountRef.current;
 
     const finalScore = goodTaps - badTaps;
     router.push(`/score?score=${finalScore}`);
-  };
+  }, [router]);
 
   const gameLoop = useCallback(() => {
     /* console.log("Inside gameLoop. goodTap:", goodTapRef); */
@@ -251,65 +250,141 @@ const GameCanvas: React.FC = () => {
   ]);
 
   useEffect(() => {
+    console.log("useEffect triggered.");
     const audio = audioRef.current;
 
-    if (audio && !audioContext) {
-      const newAudioContext = new window.AudioContext();
-      setAudioContext(newAudioContext);
+    if (audio) {
+      if (!audioContext) {
+        console.log("AudioContext has not been initialized yet.");
+      } else {
+        console.log("AudioContext is already available.");
 
-      const audioSource = newAudioContext.createMediaElementSource(audio);
-      const newAnalyser = newAudioContext.createAnalyser();
-      setAnalyser(newAnalyser);
+        // Loading sounds
+        fetch("goodhit1.mp3")
+          .then((response) => response.arrayBuffer())
+          .then((arrayBuffer) => audioContext.decodeAudioData(arrayBuffer))
+          .then((audioBuffer) => {
+            goodTapSoundBuffer.current = audioBuffer;
+          });
+        fetch("badhit1.mp3")
+          .then((response) => response.arrayBuffer())
+          .then((arrayBuffer) => audioContext.decodeAudioData(arrayBuffer))
+          .then((audioBuffer) => {
+            badTapSoundBuffer.current = audioBuffer;
+          });
 
-      audioSource.connect(newAnalyser);
-      newAnalyser.connect(newAudioContext.destination);
-    }
+        // Add ended event listener
+        audio.addEventListener("ended", handleSongEnd);
 
-    if (audioContext) {
-      fetch("goodhit1.mp3")
-        .then((response) => response.arrayBuffer())
-        .then((arrayBuffer) => audioContext.decodeAudioData(arrayBuffer))
-        .then((audioBuffer) => {
-          goodTapSoundBuffer.current = audioBuffer;
-        });
-      fetch("badhit1.mp3")
-        .then((response) => response.arrayBuffer())
-        .then((arrayBuffer) => audioContext.decodeAudioData(arrayBuffer))
-        .then((audioBuffer) => {
-          badTapSoundBuffer.current = audioBuffer;
-        });
+        // Cleanup the event listener
+        return () => {
+          audio.removeEventListener("ended", handleSongEnd);
+        };
+      }
+    } else {
+      console.log("Audio not available yet.");
     }
 
     loadUserCSV();
     loadCompCSV();
+  }, [audioContext, handleSongEnd]);
+
+  /* const togglePlayPause = () => {
+    const audio = audioRef.current;
+
+    if (!audioContext) {
+      console.log("Initializing AudioContext.");
+      const newAudioContext = new window.AudioContext();
+      setAudioContext(newAudioContext);
+
+      const newAnalyser = newAudioContext.createAnalyser();
+      setAnalyser(newAnalyser);
+      console.log("Analyser:", analyser, "newAnalyser:", newAnalyser);
+    }
 
     if (audio) {
-      audio.addEventListener("ended", handleSongEnd);
-
-      // Cleanup the event listener
-      return () => {
-        audio.removeEventListener("ended", handleSongEnd);
-      };
+      const source = audioContext!.createMediaElementSource(audio!);
+      source.connect(analyser!);
+      analyser!.connect(audioContext!.destination);
+      if (isPlaying) {
+        console.log("Pausing audio.");
+        audio.pause();
+      } else {
+        console.log("Attempting to play audio.");
+        if (audioContext && audioContext.state !== "running") {
+          audioContext.resume().then(() => {
+            setIsReadyToStart(true); // set the game as ready to start
+          });
+        }
+        audio.play().catch((error) => {
+          console.error("Playback error:", error.message);
+        });
+        audioStartTimeRef.current = Date.now() - audio.currentTime * 1000;
+      }
+      const newIsPlaying = !isPlaying;
+      setIsPlaying(newIsPlaying);
+      console.log("isPlaying:", !isPlaying);
+    } else {
+      console.log("Audio not initialized");
     }
-  }, [audioContext]);
+  }; */
 
   const togglePlayPause = () => {
     const audio = audioRef.current;
-    if (audio && audioContext) {
+
+    // Check if audioContext has been initialized, if not, initialize it.
+    if (!audioContext) {
+      console.log("Initializing AudioContext.");
+      const newAudioContext = new window.AudioContext();
+      setAudioContext(newAudioContext);
+
+      const newAnalyser = newAudioContext.createAnalyser();
+      setAnalyser(newAnalyser);
+
+      // Here, make sure that audio exists and audioContext is available
+      if (audio && newAudioContext) {
+        const source = newAudioContext.createMediaElementSource(audio);
+        source.connect(newAnalyser);
+        newAnalyser.connect(newAudioContext.destination);
+      }
+    }
+
+    if (audio) {
       if (isPlaying) {
-        audioContext.suspend();
+        console.log("Pausing audio.");
         audio.pause();
       } else {
-        audioContext.resume();
-        audio.play();
-        audioStartTimeRef.current = Date.now() - audio.currentTime * 1000; // This line captures the start time of the audio.
+        console.log("Attempting to play audio.");
+        if (audioContext && audioContext.state !== "running") {
+          audioContext.resume().then(() => {
+            setIsReadyToStart(true); // set the game as ready to start
+          });
+        }
+        audio.play().catch((error) => {
+          console.error("Playback error:", error.message);
+        });
+        audioStartTimeRef.current = Date.now() - audio.currentTime * 1000;
       }
       setIsPlaying(!isPlaying);
+      console.log("isPlaying:", !isPlaying);
+    } else {
+      console.log("Audio not initialized");
     }
   };
 
   useEffect(() => {
-    if (!analyser) return;
+    console.log(
+      "useEffect for gameLoop triggered, isPlaying:",
+      isPlaying,
+      "audioContext:",
+      audioContext,
+      "analyser:",
+      analyser
+    );
+    if (!analyser || !isPlaying || !audioContext) {
+      console.log("Analyser or audio not initialized");
+      return;
+    }
 
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
@@ -319,13 +394,14 @@ const GameCanvas: React.FC = () => {
 
     window.addEventListener("keydown", handleKeyDown);
 
+    console.log("Starting gameLoop");
     gameLoop();
 
     return () => {
       /* console.log("Cleaning up keydown listener"); */
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [analyser, audioContext, gameLoop]);
+  }, [analyser, audioContext, gameLoop, isPlaying]);
 
   useEffect(() => {
     const preventSpacebarDefault = (event: KeyboardEvent) => {
@@ -347,7 +423,7 @@ const GameCanvas: React.FC = () => {
         ref={canvasRef}
         width={800}
         height={600}
-        className="flex justify-center"
+        className="flex justify-center items-center"
       ></canvas>
       {isPlaying ? (
         <button
