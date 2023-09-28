@@ -12,13 +12,13 @@ const Score = () => {
   const score: number = Number(searchParams.get("score"));
   let scoreCategory: string = "";
 
-  if (score > 52) {
+  if (score >= 52) {
     scoreCategory = "Animal";
-  } else if (score > 50 && score < 53) {
+  } else if (score >= 48 && score <= 51) {
     scoreCategory = "Zigaboo";
-  } else if (score > 45 && score < 51) {
+  } else if (score >= 43 && score <= 47) {
     scoreCategory = "Ringo";
-  } else if (score < 46) {
+  } else if (score <= 42) {
     scoreCategory = "Flanders";
   }
   console.log("Score", score, scoreCategory);
@@ -73,14 +73,13 @@ const Score = () => {
       <p className="text-xl mt-4 text-center">
         {descriptionMap[scoreCategory]}
       </p>
-
+      <p className="mt-4 text-lg">Test your sense of rhythm at groovtap.com</p>
       <Link
         href="/"
         className="bg-slate-800 text-white text-2xl p-2 rounded-lg mt-6"
       >
-        Back to Game
+        Try Again
       </Link>
-      <p className="mt-4 text-lg">Test your sense of rhythm at groovtap.com</p>
     </div>
   );
 };
