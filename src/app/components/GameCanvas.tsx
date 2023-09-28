@@ -433,7 +433,7 @@ const GameCanvas: React.FC = () => {
       {isPlaying ? (
         <button
           onClick={togglePlayPause}
-          className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white text-black p-4"
+          className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white text-black p-4 rounded-lg"
         >
           Pause
         </button>
