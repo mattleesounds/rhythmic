@@ -3,7 +3,7 @@ import Score from "../components/Score";
 
 const page = () => {
   return (
-    <main className="bg-slate-200 h-screen">
+    <main className="bg-slate-100 h-screen">
       <Score />
     </main>
   );

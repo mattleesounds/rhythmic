@@ -184,7 +184,7 @@ const GameCanvas: React.FC = () => {
     ctx.fillText(`${badTapCountRef.current}`, canvas!.width - 100, 60);
 
     const currentAudioTime = audio.currentTime * 1000;
-    const buffer = 50;
+    const buffer = 10;
 
     const isCompHitTime = compHitTimingsRef.current.some(
       (t) => Math.abs(currentAudioTime - t) <= buffer
@@ -199,25 +199,33 @@ const GameCanvas: React.FC = () => {
       const timeSinceTap = Date.now() - goodTapRef.current;
 
       const wasGoodTap = userHitTimingsRef.current.some(
-        (hitTime) => Math.abs(currentAudioTime - hitTime.time) <= 150
+        (hitTime) => Math.abs(currentAudioTime - hitTime.time) <= 200
       );
 
-      if (
-        wasGoodTap &&
-        timeSinceTap < 50 &&
-        lastPlayedTapRef.current !== goodTapRef.current
-      ) {
-        console.log("Playing good tap sound at:", goodTapRef.current);
-        handleUserTap();
-        lastPlayedTapRef.current = goodTapRef.current;
-      } else if (
-        !wasGoodTap &&
-        timeSinceTap < 50 &&
-        lastPlayedBadTapRef.current !== goodTapRef.current
-      ) {
-        console.log("Playing bad tap sound at:", goodTapRef.current);
-        handleBadTap();
-        lastPlayedBadTapRef.current = goodTapRef.current;
+      if (goodTapRef.current) {
+        const timeSinceTap = Date.now() - goodTapRef.current;
+
+        const wasGoodTap = userHitTimingsRef.current.some(
+          (hitTime) => Math.abs(currentAudioTime - hitTime.time) <= 200
+        );
+
+        if (
+          wasGoodTap &&
+          timeSinceTap < 50 &&
+          lastPlayedTapRef.current !== goodTapRef.current
+        ) {
+          console.log("Playing good tap sound at:", goodTapRef.current);
+          handleUserTap();
+          lastPlayedTapRef.current = goodTapRef.current;
+        } else if (
+          !wasGoodTap &&
+          timeSinceTap < 50 &&
+          lastPlayedBadTapRef.current !== goodTapRef.current
+        ) {
+          console.log("Playing bad tap sound at:", goodTapRef.current);
+          handleBadTap();
+          lastPlayedBadTapRef.current = goodTapRef.current;
+        }
       }
     }
     const currentTimestamp = Date.now();
@@ -436,8 +444,14 @@ const GameCanvas: React.FC = () => {
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white text-black p-4">
           <div>
             <h2>How to Play:</h2>
-            <p>Press any key from [Space to Z] to hit the rhythm.</p>
-            <p>Try to match the blue flashes for perfect hits!</p>
+            <p>
+              Listen carefully to the rhythm played while the screen is black.
+            </p>
+            <p>
+              Hit any key to tap the same rhythm during the following bar when
+              the screen is gray.
+            </p>
+            <p>Green screen means your tap was good, red means it was bad.</p>
             <div className="flex justify-center">
               <button
                 onClick={togglePlayPause}
