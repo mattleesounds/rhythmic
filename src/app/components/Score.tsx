@@ -12,13 +12,13 @@ const Score = () => {
   const score: number = Number(searchParams.get("score"));
   let scoreCategory: string = "";
 
-  if (score >= 52) {
+  if (score >= 51) {
     scoreCategory = "Animal";
-  } else if (score >= 48 && score <= 51) {
+  } else if (score >= 41 && score <= 50) {
     scoreCategory = "Zigaboo";
-  } else if (score >= 43 && score <= 47) {
+  } else if (score >= 31 && score <= 40) {
     scoreCategory = "Ringo";
-  } else if (score <= 42) {
+  } else if (score <= 30) {
     scoreCategory = "Flanders";
   }
   console.log("Score", score, scoreCategory);
