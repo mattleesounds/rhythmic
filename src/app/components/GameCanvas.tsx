@@ -444,10 +444,7 @@ const GameCanvas: React.FC = () => {
             <p>
               - Listen carefully to the rhythm played while the screen is gray.
             </p>
-            <p>
-              - Hit any key to tap the same rhythm during the following bar(the
-              next four beats) when the screen is black.
-            </p>
+            <p>- Hit any key to repeat the rhythm when the screen is black.</p>
             <p>- Green flash means your tap was good, red means it was bad.</p>
             <div className="flex justify-center">
               <button
