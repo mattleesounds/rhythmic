@@ -34,7 +34,7 @@ export default function Home() {
               height={200}
               className="mt-8 mb-4"
             />
-            <div className="flex justify-center mb-12">
+            <div className="flex justify-center mb-4">
               <GameCanvas />
             </div>
           </div>
