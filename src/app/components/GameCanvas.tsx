@@ -94,7 +94,7 @@ const GameCanvas: React.FC = () => {
     const goodTaps = goodTapCountRef.current;
     const badTaps = badTapCountRef.current;
 
-    const finalScore = goodTaps - badTaps;
+    const finalScore = goodTaps - badTaps / 2;
     router.push(`/score?score=${finalScore}`);
   }, [router]);
 
