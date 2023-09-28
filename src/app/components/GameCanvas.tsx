@@ -205,14 +205,14 @@ const GameCanvas: React.FC = () => {
       const timeSinceTap = Date.now() - goodTapRef.current;
 
       const wasGoodTap = userHitTimingsRef.current.some(
-        (hitTime) => Math.abs(currentAudioTime - hitTime.time) <= 100
+        (hitTime) => Math.abs(currentAudioTime - hitTime.time) <= 150
       );
       if (goodTapRef.current) {
         const timeSinceTap = Date.now() - goodTapRef.current;
 
         if (timeSinceTap < 100) {
           const wasGoodTap = userHitTimingsRef.current.some(
-            (hitTime) => Math.abs(currentAudioTime - hitTime.time) <= 100
+            (hitTime) => Math.abs(currentAudioTime - hitTime.time) <= 150
           );
 
           if (wasGoodTap && lastPlayedTapRef.current !== goodTapRef.current) {
