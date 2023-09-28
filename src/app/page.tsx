@@ -24,8 +24,8 @@ export default function Home() {
     return <Mobile />;
   } else {
     return (
-      <main className="bg-slate-100 h-screen w-full flex justify-center">
-        <div className="max-w-[1240px]">
+      <main className="bg-slate-100 h-full w-full flex justify-center">
+        <div className="max-w-[1240px] bg-slate-100 mb-12">
           <div className="flex-1 flex flex-col items-center">
             <Image
               src={"/images/2.png"}
@@ -34,7 +34,7 @@ export default function Home() {
               height={200}
               className="mt-8 mb-4"
             />
-            <div className="flex justify-center mb-24">
+            <div className="flex justify-center mb-12">
               <GameCanvas />
             </div>
           </div>
