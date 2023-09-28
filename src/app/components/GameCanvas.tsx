@@ -24,7 +24,7 @@ const GameCanvas: React.FC = () => {
   const lastPlayedTapRef = useRef<number | null>(null);
   const phraseIntervalRef = useRef<number | null>(null);
   const lastBackgroundColorChangeRef = useRef<number | null>(null);
-  const currentBgColorRef = useRef<string>("black");
+  const currentBgColorRef = useRef<string>("gray");
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
@@ -119,7 +119,7 @@ const GameCanvas: React.FC = () => {
     ) {
       // Toggle the background color
       currentBgColorRef.current =
-        currentBgColorRef.current === "gray" ? "black" : "gray";
+        currentBgColorRef.current === "black" ? "gray" : "black";
 
       // Update the time of the last background color change
       lastBackgroundColorChangeRef.current = currentAudioTimeMs;
@@ -184,7 +184,7 @@ const GameCanvas: React.FC = () => {
     ctx.fillText(`${badTapCountRef.current}`, canvas!.width - 100, 60);
 
     const currentAudioTime = audio.currentTime * 1000;
-    const buffer = 10;
+    const buffer = 30;
 
     const isCompHitTime = compHitTimingsRef.current.some(
       (t) => Math.abs(currentAudioTime - t) <= buffer
@@ -199,14 +199,14 @@ const GameCanvas: React.FC = () => {
       const timeSinceTap = Date.now() - goodTapRef.current;
 
       const wasGoodTap = userHitTimingsRef.current.some(
-        (hitTime) => Math.abs(currentAudioTime - hitTime.time) <= 200
+        (hitTime) => Math.abs(currentAudioTime - hitTime.time) <= 100
       );
 
       if (goodTapRef.current) {
         const timeSinceTap = Date.now() - goodTapRef.current;
 
         const wasGoodTap = userHitTimingsRef.current.some(
-          (hitTime) => Math.abs(currentAudioTime - hitTime.time) <= 200
+          (hitTime) => Math.abs(currentAudioTime - hitTime.time) <= 100
         );
 
         if (
